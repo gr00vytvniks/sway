@@ -1330,7 +1330,9 @@ impl TypedExpression {
         let mut errors = vec![];
         let mut typed_fields_buf = vec![];
         let mut module = check!(
-            namespace.find_module_relative(&call_path.prefixes).map(|ns| ns.clone()),
+            namespace
+                .find_module_relative(&call_path.prefixes)
+                .map(|ns| ns.clone()),
             return err(warnings, errors),
             warnings,
             errors
