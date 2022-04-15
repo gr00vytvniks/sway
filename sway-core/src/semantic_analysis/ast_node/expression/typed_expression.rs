@@ -1338,7 +1338,7 @@ impl TypedExpression {
             errors
         );
 
-        let decl = match module.clone().get_symbol(&call_path.suffix).value {
+        let decl = match module.get_symbol(&call_path.suffix).value {
             Some(TypedDeclaration::StructDeclaration(decl)) => decl,
             Some(_) => {
                 errors.push(CompileError::DeclaredNonStructAsStruct {
