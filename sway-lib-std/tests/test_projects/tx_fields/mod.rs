@@ -8,6 +8,7 @@ use fuels_signers::util::test_helpers::setup_test_provider_and_wallet;
 use fuels_signers::wallet::Wallet;
 use fuels_signers::Signer;
 
+
 abigen!(
     TxContractTest,
     "test_artifacts/tx_contract/out/debug/tx_contract-abi.json",
@@ -233,10 +234,6 @@ async fn can_get_tx_input_type() {
 async fn can_get_tx_input_coin_owner() {
     let (contract_instance, _, wallet) = get_contracts().await;
 
-    // Coin input
-    let input_owner = txcontracttest_mod::Address {
-        value: wallet.address().into(),
-    };
     let result_ptr = contract_instance
         .get_tx_input_pointer(1)
         .call()
@@ -247,7 +244,7 @@ async fn can_get_tx_input_coin_owner() {
         .call()
         .await
         .unwrap();
-    assert_eq!(result.value, input_owner);
+    assert_eq!(result.value, wallet.address());
 }
 
 #[tokio::test]

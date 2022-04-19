@@ -60,7 +60,7 @@ async fn can_get_this_balance() {
         .unwrap();
 
     caller_instance
-        .call_receive_coins(send_amount, context_sway_id)
+        .call_receive_coins(send_amount, context_id)
         .set_contracts(&[context_id])
         .tx_params(TxParameters::new(None, Some(1_000_000), None))
         .call()
@@ -130,14 +130,14 @@ async fn can_get_msg_id() {
         .unwrap();
 
     let result = caller_instance
-        .call_get_asset_id_with_coins(send_amount, context_sway_id)
+        .call_get_asset_id_with_coins(send_amount, context_id)
         .set_contracts(&[caller_id, context_id])
         .tx_params(TxParameters::new(None, Some(1_000_000), None))
         .call()
         .await
         .unwrap();
 
-    assert_eq!(result.value, caller_sway_id);
+    assert_eq!(result.value, caller_id);
 }
 
 #[tokio::test]
