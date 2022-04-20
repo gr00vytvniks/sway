@@ -868,7 +868,6 @@ dependencies = [
 name = "counter"
 version = "0.1.0"
 dependencies = [
- "fuel-gql-client",
  "fuel-tx 0.7.0",
  "fuels-abigen-macro",
  "fuels-contract",
