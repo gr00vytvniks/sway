@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "docstrings",
     "examples/build-all-examples",
+    "examples/counter",
     "forc",
     "forc-explore",
     "forc-fmt",
