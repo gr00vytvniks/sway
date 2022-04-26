@@ -5,8 +5,8 @@ use crate::{
     parser::Rule,
     CompileResult, Expression,
 };
-use sway_types::span;
 
+use sway_types::span;
 
 #[derive(Debug, Clone)]
 pub struct ReturnStatement {
