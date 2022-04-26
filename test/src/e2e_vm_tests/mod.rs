@@ -25,6 +25,10 @@ pub fn run(filter_regex: Option<regex::Regex>) {
             "should_pass/language/basic_func_decl",
             ProgramState::Return(1), // 1 == true
         ),
+        (
+            "should_pass/language/builtin_type_method_call",
+            ProgramState::Return(3),
+        ),
         ("should_pass/language/dependencies", ProgramState::Return(0)), // 0 == false
         (
             "should_pass/language/if_elseif_enum",
@@ -94,8 +98,7 @@ pub fn run(filter_regex: Option<regex::Regex>) {
             ProgramState::Return(43),
         ),
         ("should_pass/language/bool_and_or", ProgramState::Return(42)),
-        ("should_pass/language/neq_4_test", ProgramState::Return(0)),
-        ("should_pass/language/eq_4_test", ProgramState::Return(1)),
+        ("should_pass/language/eq_and_neq", ProgramState::Return(1)),
         (
             "should_pass/language/local_impl_for_ord",
             ProgramState::Return(1), // true
@@ -127,6 +130,7 @@ pub fn run(filter_regex: Option<regex::Regex>) {
             ProgramState::Return(1), // true
         ),
         ("should_pass/language/generic_enum", ProgramState::Return(1)), // true
+        ("should_pass/language/u64_ops", ProgramState::Return(1)),      // true
         (
             "should_pass/language/import_method_from_other_file",
             ProgramState::Return(10), // true
@@ -293,6 +297,10 @@ pub fn run(filter_regex: Option<regex::Regex>) {
             "should_pass/language/import_trailing_comma",
             ProgramState::Return(0),
         ),
+        (
+            "should_pass/language/primitive_type_argument",
+            ProgramState::Return(5),
+        ),
     ];
 
     let mut number_of_tests_run =
@@ -407,6 +415,7 @@ pub fn run(filter_regex: Option<regex::Regex>) {
         "should_fail/generics_unhelpful_error",
         "should_fail/generic_shadows_generic",
         "should_fail/different_contract_caller_types",
+        "should_fail/primitive_type_argument",
     ];
     number_of_tests_run += negative_project_names.iter().fold(0, |acc, name| {
         if filter(name) {

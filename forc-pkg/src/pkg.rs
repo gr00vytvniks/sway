@@ -143,6 +143,7 @@ pub struct BuildPlan {
 /// Parameters to pass through to the `sway_core::BuildConfig` during compilation.
 pub struct BuildConfig {
     pub use_orig_asm: bool,
+    pub use_orig_parser: bool,
     pub print_ir: bool,
     pub print_finalized_asm: bool,
     pub print_intermediate_asm: bool,
@@ -536,11 +537,19 @@ pub fn graph_to_path_map(
                 let detailed = parent_manifest
                     .dependencies
                     .as_ref()
-                    .and_then(|deps| match &deps[&dep_name] {
-                        Dependency::Detailed(detailed) => Some(detailed),
-                        Dependency::Simple(_) => None,
+                    .and_then(|deps| deps.get(&dep_name))
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "dependency required for path reconstruction \
+                            has been removed from the manifest"
+                        )
                     })
-                    .ok_or_else(|| anyhow!("missing path info for dependency: {}", dep.name))?;
+                    .and_then(|dep| match dep {
+                        Dependency::Detailed(detailed) => Ok(detailed),
+                        Dependency::Simple(_) => {
+                            bail!("missing path info for dependency: {}", &dep_name);
+                        }
+                    })?;
                 let rel_dep_path = detailed
                     .path
                     .as_ref()
@@ -934,6 +943,7 @@ pub fn sway_build_config(
         manifest_dir.to_path_buf(),
     )
     .use_orig_asm(build_conf.use_orig_asm)
+    .use_orig_parser(build_conf.use_orig_parser)
     .print_finalized_asm(build_conf.print_finalized_asm)
     .print_intermediate_asm(build_conf.print_intermediate_asm)
     .print_ir(build_conf.print_ir);
