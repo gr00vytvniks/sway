@@ -9,6 +9,7 @@ dep contract_id;
 dep context;
 dep hash;
 dep storage;
+dep str_ops;
 dep b512;
 dep address;
 dep tx;
