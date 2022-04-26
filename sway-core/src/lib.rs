@@ -27,7 +27,6 @@ use crate::{
 pub use asm_generation::{AbstractInstructionSet, FinalizedAsm, SwayAsmSet};
 pub use build_config::BuildConfig;
 use control_flow_analysis::{ControlFlowGraph, Graph};
-use pest::iterators::Pair;
 use pest::Parser;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -99,22 +98,6 @@ pub enum AstNodeContent {
     IncludeStatement(IncludeStatement),
 }
 
-impl ParseTree {
-    /// Create a new, empty, [ParseTree] from a span which represents the source code that it will
-    /// cover.
-    pub(crate) fn new(span: span::Span) -> Self {
-        ParseTree {
-            root_nodes: Vec::new(),
-            span,
-        }
-    }
-
-    /// Push a new [AstNode] on to the end of a [ParseTree]'s root nodes.
-    pub(crate) fn push(&mut self, new_node: AstNode) {
-        self.root_nodes.push(new_node);
-    }
-}
-
 /// Given an input `Arc<str>` and an optional [BuildConfig], parse the input into a [SwayParseTree].
 ///
 /// # Example
@@ -129,58 +112,30 @@ impl ParseTree {
 /// # Panics
 /// Panics if the generated parser from Pest panics.
 pub fn parse(input: Arc<str>, config: Option<&BuildConfig>) -> CompileResult<SwayParseTree> {
-    let use_orig_parser = config
-        .map(|config| config.use_orig_parser)
-        .unwrap_or_default();
-    if use_orig_parser {
-        let mut warnings: Vec<CompileWarning> = Vec::new();
-        let mut errors: Vec<CompileError> = Vec::new();
-        let mut parsed = match SwayParser::parse(Rule::program, input.clone()) {
-            Ok(o) => o,
-            Err(e) => {
-                let path = config.map(|config| config.path());
-                return err(
-                    Vec::new(),
-                    vec![CompileError::ParseFailure {
-                        span: span::Span::new(input, get_start(&e), get_end(&e), path).unwrap(),
-                        err: e,
-                    }],
-                );
-            }
-        };
-        let parsed_root = check!(
-            parse_root_from_pairs(parsed.next().unwrap().into_inner(), config),
-            return err(warnings, errors),
-            warnings,
-            errors
-        );
-        ok(parsed_root, warnings, errors)
-    } else {
-        let path = config.map(|config| config.path());
-        let program = match sway_parse::parse_file(input, path) {
-            Ok(program) => program,
-            Err(error) => {
-                let errors = match error {
-                    sway_parse::ParseFileError::Lex(error) => vec![CompileError::Lex { error }],
-                    sway_parse::ParseFileError::Parse(errors) => errors
-                        .into_iter()
-                        .map(|error| CompileError::Parse { error })
-                        .collect(),
-                };
-                return err(vec![], errors);
-            }
-        };
-        let mut errors = Vec::new();
-        let mut warnings = Vec::new();
-        let compile_result = crate::convert_parse_tree::convert_parse_tree(program);
-        let sway_parse_tree = check!(
-            compile_result,
-            return err(warnings, errors),
-            warnings,
-            errors,
-        );
-        ok(sway_parse_tree, warnings, errors)
-    }
+    let path = config.map(|config| config.path());
+    let program = match sway_parse::parse_file(input, path) {
+        Ok(program) => program,
+        Err(error) => {
+            let errors = match error {
+                sway_parse::ParseFileError::Lex(error) => vec![CompileError::Lex { error }],
+                sway_parse::ParseFileError::Parse(errors) => errors
+                    .into_iter()
+                    .map(|error| CompileError::Parse { error })
+                    .collect(),
+            };
+            return err(vec![], errors);
+        }
+    };
+    let mut errors = Vec::new();
+    let mut warnings = Vec::new();
+    let compile_result = crate::convert_parse_tree::convert_parse_tree(program);
+    let sway_parse_tree = check!(
+        compile_result,
+        return err(warnings, errors),
+        warnings,
+        errors,
+    );
+    ok(sway_parse_tree, warnings, errors)
 }
 
 /// Represents the result of compiling Sway code via [compile_to_asm].
@@ -236,22 +191,6 @@ pub fn extract_keyword(line: &str, rule: Rule) -> Option<String> {
         Some(pair.as_str().trim().to_string())
     } else {
         None
-    }
-}
-
-/// Takes a parse failure as input and returns either the index of the positional pest parse error, or the start position of the span of text that the error occurs.
-fn get_start(err: &pest::error::Error<Rule>) -> usize {
-    match err.location {
-        pest::error::InputLocation::Pos(num) => num,
-        pest::error::InputLocation::Span((start, _)) => start,
-    }
-}
-
-/// Takes a parse failure as input and returns either the index of the positional pest parse error, or the end position of the span of text that the error occurs.
-fn get_end(err: &pest::error::Error<Rule>) -> usize {
-    match err.location {
-        pest::error::InputLocation::Pos(num) => num,
-        pest::error::InputLocation::Span((_, end)) => end,
     }
 }
 
@@ -602,269 +541,6 @@ fn perform_control_flow_analysis(
     let graph = ControlFlowGraph::construct_return_path_graph(tree);
     errors.append(&mut graph.analyze_return_paths());
     (warnings, errors)
-}
-
-/// The basic recursive parser which handles the top-level parsing given the output of the
-/// pest-generated parser.
-fn parse_root_from_pairs(
-    input: impl Iterator<Item = Pair<Rule>>,
-    config: Option<&BuildConfig>,
-) -> CompileResult<SwayParseTree> {
-    let path = config.map(|config| config.dir_of_code.clone());
-    let mut warnings = Vec::new();
-    let mut errors = Vec::new();
-    let mut fuel_ast_opt = None;
-    for block in input {
-        let mut parse_tree = ParseTree::new(span::Span::from_pest(block.as_span(), path.clone()));
-        let rule = block.as_rule();
-        let input = block.clone().into_inner();
-        let mut library_name = None;
-        for pair in input {
-            match pair.as_rule() {
-                Rule::non_var_decl => {
-                    let span = span::Span::from_pest(pair.as_span(), path.clone());
-                    let decls = check!(
-                        Declaration::parse_non_var_from_pair(pair.clone(), config),
-                        continue,
-                        warnings,
-                        errors
-                    );
-                    for decl in decls.into_iter() {
-                        parse_tree.push(AstNode {
-                            content: AstNodeContent::Declaration(decl),
-                            span: span.clone(),
-                        });
-                    }
-                }
-                Rule::use_statement => {
-                    let stmt = check!(
-                        UseStatement::parse_from_pair(pair.clone(), config),
-                        continue,
-                        warnings,
-                        errors
-                    );
-                    for entry in stmt {
-                        parse_tree.push(AstNode {
-                            content: AstNodeContent::UseStatement(entry.clone()),
-                            span: span::Span::from_pest(pair.as_span(), path.clone()),
-                        });
-                    }
-                }
-                Rule::library_name => {
-                    let lib_pair = pair.into_inner().next().unwrap();
-                    library_name = Some(check!(
-                        parse_tree::ident::parse_from_pair(lib_pair, config),
-                        continue,
-                        warnings,
-                        errors
-                    ));
-                }
-                Rule::include_statement => {
-                    // parse the include statement into a reference to a specific file
-                    let include_statement = check!(
-                        IncludeStatement::parse_from_pair(pair.clone(), config),
-                        continue,
-                        warnings,
-                        errors
-                    );
-                    parse_tree.push(AstNode {
-                        content: AstNodeContent::IncludeStatement(include_statement),
-                        span: span::Span::from_pest(pair.as_span(), path.clone()),
-                    });
-                }
-                _ => unreachable!("{:?}", pair.as_str()),
-            }
-        }
-        match rule {
-            Rule::contract => {
-                fuel_ast_opt = Some(SwayParseTree {
-                    tree_type: TreeType::Contract,
-                    tree: parse_tree,
-                });
-            }
-            Rule::script => {
-                fuel_ast_opt = Some(SwayParseTree {
-                    tree_type: TreeType::Script,
-                    tree: parse_tree,
-                });
-            }
-            Rule::predicate => {
-                fuel_ast_opt = Some(SwayParseTree {
-                    tree_type: TreeType::Predicate,
-                    tree: parse_tree,
-                });
-            }
-            Rule::library => {
-                fuel_ast_opt = Some(SwayParseTree {
-                    tree_type: TreeType::Library {
-                        name: library_name.expect(
-                            "Safe unwrap, because the sway-core enforces the library keyword is \
-                             followed by a name. This is an invariant",
-                        ),
-                    },
-                    tree: parse_tree,
-                });
-            }
-            Rule::EOI => (),
-            a => errors.push(CompileError::InvalidTopLevelItem(
-                a,
-                span::Span::from_pest(block.as_span(), path.clone()),
-            )),
-        }
-    }
-
-    CompileResult::new(fuel_ast_opt, warnings, errors)
-}
-
-#[test]
-fn test_basic_prog() {
-    let prog = parse(
-        r#"
-        contract;
-
-    enum yo
-    <T>
-    where
-    T: IsAThing
-    {
-        x: u32,
-        y: MyStruct<u32>
-    }
-
-    enum  MyOtherSumType
-    {
-        x: u32,
-        y: MyStruct<u32>
-    }
-        struct MyStruct<T> {
-            field_name: u64,
-            other_field: T,
-        }
-
-
-    fn generic_function
-    <T>
-    (arg1: u64,
-    arg2: T)
-    ->
-    T
-    where T: Display,
-          T: Debug {
-          let x: MyStruct =
-          MyStruct
-          {
-              field_name:
-              5
-          };
-          return
-          match
-            arg1
-          {
-               1
-               => true,
-               _ => { return false; },
-          };
-    }
-
-    struct MyStruct {
-        test: string,
-    }
-
-
-
-    use stdlib::println;
-
-    trait MyTrait {
-        // interface points
-        fn myfunc(x: int) -> unit;
-        } {
-        // methods
-        fn calls_interface_fn(x: int) -> unit {
-            // declare a byte
-            let x = 0b10101111;
-            let mut y = 0b11111111;
-            self.interface_fn(x);
-        }
-    }
-
-    pub fn prints_number_five() -> u8 {
-        let x: u8 = 5;
-        let reference_to_x = ref x;
-        let second_value_of_x = deref x; // u8 is `Copy` so this clones
-        println(x);
-         x.to_string();
-         let some_list = [
-         5,
-         10 + 3 / 2,
-         func_app(my_args, (so_many_args))];
-        return 5;
-    }
-    "#
-        .into(),
-        None,
-    );
-    let mut warnings: Vec<CompileWarning> = Vec::new();
-    let mut errors: Vec<CompileError> = Vec::new();
-    prog.unwrap(&mut warnings, &mut errors);
-}
-#[test]
-fn test_parenthesized() {
-    let prog = parse(
-        r#"
-        contract;
-        pub fn some_abi_func() -> unit {
-            let x = (5 + 6 / (1 + (2 / 1) + 4));
-            return;
-        }
-    "#
-        .into(),
-        None,
-    );
-    let mut warnings: Vec<CompileWarning> = Vec::new();
-    let mut errors: Vec<CompileError> = Vec::new();
-    prog.unwrap(&mut warnings, &mut errors);
-}
-
-#[test]
-fn test_unary_ordering() {
-    use crate::parse_tree::declaration::FunctionDeclaration;
-    let prog = parse(
-        r#"
-    script;
-    fn main() -> bool {
-        let a = true;
-        let b = true;
-        !a && b;
-    }"#
-        .into(),
-        None,
-    );
-    let mut warnings: Vec<CompileWarning> = Vec::new();
-    let mut errors: Vec<CompileError> = Vec::new();
-    let prog = prog.unwrap(&mut warnings, &mut errors);
-    // this should parse as `(!a) && b`, not `!(a && b)`. So, the top level
-    // expression should be `&&`
-    if let AstNode {
-        content:
-            AstNodeContent::Declaration(Declaration::FunctionDeclaration(FunctionDeclaration {
-                body,
-                ..
-            })),
-        ..
-    } = &prog.tree.root_nodes[0]
-    {
-        if let AstNode {
-            content: AstNodeContent::Expression(Expression::LazyOperator { op, .. }),
-            ..
-        } = &body.contents[2]
-        {
-            assert_eq!(op, &LazyOp::And)
-        } else {
-            panic!("Was not lazy operator.")
-        }
-    } else {
-        panic!("Was not ast node")
-    };
 }
 
 /// We want compile errors and warnings to retain their ordering, since typically
