@@ -3,7 +3,7 @@ library str_ops;
 
 
 /// returns the boolean result of comparing 2 str[n] values.
-pub fn string_eq<T, O>(str_a: T, str_b: O) -> bool {
+pub fn are_strings_eq<T, O>(str_a: T, str_b: O) -> bool {
     let size = size_of::<T>();
     let other_size = size_of::<O>();
     if size == other_size {
