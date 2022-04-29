@@ -10,7 +10,7 @@ fn main() -> bool {
     let f: str[5] = "Chain";
     let e = a;
 
-    assert(string_eq(a, b));
+    assert(are_strings_eq(a, b));
 
     true
 }
