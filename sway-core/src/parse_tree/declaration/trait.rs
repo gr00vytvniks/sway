@@ -26,9 +26,9 @@ pub(crate) struct Supertrait {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub(crate) struct TraitFn {
-    pub(crate) name: Ident,
-    pub(crate) parameters: Vec<FunctionParameter>,
-    pub(crate) return_type: TypeInfo,
+pub struct TraitFn {
+    pub name: Ident,
+    pub parameters: Vec<FunctionParameter>,
+    pub return_type: TypeInfo,
     pub(crate) return_type_span: Span,
 }
