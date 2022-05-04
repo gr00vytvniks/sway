@@ -6,6 +6,8 @@ use std::slice::Iter;
 use std::str::Chars;
 use sway_core::{extract_keyword, Rule};
 
+const MAX_LINE_LENGTH: usize = 100;
+
 /// Performs the formatting of the `comments` section in your code.
 /// Takes in a function that provides the logic to handle the rest of the code.
 fn custom_format_with_comments<F>(text: &str, custom_format_fn: &mut F) -> String
@@ -85,35 +87,36 @@ pub fn format_delineated_path(line: &str) -> String {
     line.chars().filter(|c| !c.is_whitespace()).collect()
 }
 
+/// Tokenizes the line on separators keeping the separators.
+fn tokenize(line: &str) -> Vec<String> {
+    let mut buffer: Vec<String> = Vec::new();
+    let mut current = 0;
+    for (index, separator) in line.match_indices(|c: char| c == ',' || c == '{' || c == '}') {
+        if index != current {
+            // Chomp all whitespace including newlines, and only push
+            // resulting token if what's left is not an empty string. This
+            // is needed to ignore trailing commas with newlines.
+            let to_push: String = line[current..index]
+                .to_string()
+                .chars()
+                .filter(|c| !c.is_whitespace())
+                .collect();
+            if !to_push.is_empty() {
+                buffer.push(to_push);
+            }
+        }
+        buffer.push(separator.to_string());
+        current = index + separator.len();
+    }
+    if current < line.len() {
+        buffer.push(line[current..].to_string());
+    }
+    buffer
+}
+
 /// Trims whitespaces and reorders compound import statements lexicographically
 /// a::{c, b, d::{self, f, e}} -> a::{b,c,d::{self,e,f}}
 fn sort_and_filter_use_expression(line: &str) -> String {
-    /// Tokenizes the line on separators keeping the separators.
-    fn tokenize(line: &str) -> Vec<String> {
-        let mut buffer: Vec<String> = Vec::new();
-        let mut current = 0;
-        for (index, separator) in line.match_indices(|c: char| c == ',' || c == '{' || c == '}') {
-            if index != current {
-                // Chomp all whitespace including newlines, and only push
-                // resulting token if what's left is not an empty string. This
-                // is needed to ignore trailing commas with newlines.
-                let to_push: String = line[current..index]
-                    .to_string()
-                    .chars()
-                    .filter(|c| !c.is_whitespace())
-                    .collect();
-                if !to_push.is_empty() {
-                    buffer.push(to_push);
-                }
-            }
-            buffer.push(separator.to_string());
-            current = index + separator.len();
-        }
-        if current < line.len() {
-            buffer.push(line[current..].to_string());
-        }
-        buffer
-    }
     let tokens: Vec<String> = tokenize(line);
     let mut buffer: Vec<String> = Vec::new();
 
@@ -156,14 +159,70 @@ fn sort_and_filter_use_expression(line: &str) -> String {
     buffer.concat()
 }
 
+fn format_use_stmnt_length(s: &str) -> Vec<String> {
+    // We could potentially cache tokenize()'s result somewhere if we don't want
+    // to recompute. Would require updating several tests as well
+    let buff = tokenize(s);
+    let mut without_newline = buff
+        .iter()
+        .rev()
+        .map(|x| x.to_owned())
+        .collect::<Vec<String>>();
+    let mut with_newline: Vec<String> = Vec::new();
+
+    let mut line = String::new();
+    let mut open_delims = 0u8;
+
+    while let Some(mut token) = without_newline.pop() {
+        if token.as_str() == "{" {
+            open_delims += 1;
+        } else if token.as_str() == "}" {
+            open_delims -= 1;
+        }
+
+        if token.as_str() == "," && without_newline.last().map(|x| x != ",").is_some() {
+            token.push(' ');
+        }
+
+        line.push_str(&token);
+
+        let ends_with_comma = line.trim().ends_with(',');
+        let is_too_long = line.len() >= MAX_LINE_LENGTH;
+        let is_within_top_level = open_delims <= 1;
+
+        // If we can properly terminate with a '\n' then do so, else extend
+        // over the MAX_LINE_LENGTH until we can insert a line break, ensuring
+        // we keep nested bracket imports between'{' and '}' on the same line)
+        if is_too_long && ends_with_comma && is_within_top_level {
+            line.push_str("\n    ");
+            with_newline.push(line);
+            line = String::new();
+        }
+    }
+
+    if !line.is_empty() {
+        with_newline.push(line);
+    }
+
+    with_newline
+}
+
 pub fn format_use_statement(line: &str) -> String {
     let use_keyword = extract_keyword(line, Rule::use_keyword).unwrap();
     let (_, right) = line.split_once(&use_keyword).unwrap();
     let right: String = sort_and_filter_use_expression(right);
-    format!(
+    let lines = format_use_stmnt_length(&right);
+
+    let mut right = format!(
         "{}{} {}",
-        ALREADY_FORMATTED_LINE_PATTERN, use_keyword, right
-    )
+        ALREADY_FORMATTED_LINE_PATTERN, use_keyword, lines[0]
+    );
+
+    for line in lines.iter().skip(1) {
+        right.push_str(&format!("{}{}", ALREADY_FORMATTED_LINE_PATTERN, line));
+    }
+
+    right
 }
 
 pub fn format_include_statement(line: &str) -> String {
@@ -238,7 +297,7 @@ fn get_data_field_type(line: &str, iter: &mut Peekable<Enumerate<Chars>>) -> Str
 
 #[cfg(test)]
 mod tests {
-    use super::sort_and_filter_use_expression;
+    use super::{format_use_stmnt_length, sort_and_filter_use_expression, MAX_LINE_LENGTH};
 
     #[test]
     fn test_sort_and_filter_use_expression() {
@@ -277,5 +336,32 @@ mod tests {
             ),
             "a::{bar, foo};"
         );
+    }
+
+    #[test]
+    fn test_format_use_stmnt_length_properly_leaves_strings_shorter_than_max_line_length_untouched()
+    {
+        let sort_and_filter_result = "a::b::{c, d::e};";
+        assert_eq!(
+            format_use_stmnt_length(sort_and_filter_result).concat(),
+            sort_and_filter_result
+        );
+    }
+
+    #[test]
+    fn test_format_use_stmnt_length_returns_vec_of_strings_with_length_lte_max_line_length() {
+        let long_use_stmt = "std::{address::*, assert::assert, block::*, chain::auth::*, context::{* , call_frames::*}, contract_id::ContractId, hash::* , panic::panic, storage::* , token::*};";
+        let expected_result = "std::{address::*, assert::assert, block::*, chain::auth::*, context::{*, call_frames::*}, contract_id::ContractId, \n    hash::*, panic::panic, storage::*, token::*};";
+        let lines = format_use_stmnt_length(long_use_stmt);
+
+        assert_eq!(lines.len(), 2);
+        assert_eq!(lines.concat(), expected_result);
+
+        // We can't guarantee _every time_ that line.len() will be <= MAX_LINE_LENGTH
+        // but we can guarantee that line.len() will be within a certain tolerance
+        for line in lines {
+            let tolerance: usize = (0.3 * MAX_LINE_LENGTH as f32) as usize;
+            assert!(line.len() <= MAX_LINE_LENGTH + tolerance);
+        }
     }
 }

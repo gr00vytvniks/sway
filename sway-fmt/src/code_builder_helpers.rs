@@ -191,10 +191,13 @@ pub fn get_new_line_pattern(line: &str) -> Option<&str> {
 /// if it does it splits and returns the already formatted line and the rest after it
 pub fn get_already_formatted_line_pattern(line: &str) -> Option<(&str, &str)> {
     let pattern_len = ALREADY_FORMATTED_LINE_PATTERN.len();
-
     if line.len() >= pattern_len && &line[0..pattern_len] == ALREADY_FORMATTED_LINE_PATTERN {
-        // already formatted single lines end with ';'
-        let end = line.find(';').unwrap();
+        // Already formatted single lines end with ';'. Also have to account for use
+        // statements that don't end in a ';' now that they are multiline
+        let end = line
+            .find(';')
+            .unwrap_or_else(|| line.rfind(',').unwrap_or(0));
+
         let formatted_line = &line[pattern_len..end + 1];
         // rest, if any
         let rest = &line[end + 1..];
