@@ -107,7 +107,7 @@ impl TypedFunctionDeclaration {
         for type_parameter in type_parameters.iter() {
             check!(
                 temp_root[mod_path]
-                    .insert(type_parameter.name_ident.clone(), type_parameter.into()),
+                    .insert_symbol(type_parameter.name_ident.clone(), type_parameter.into()),
                 continue,
                 warnings,
                 errors
@@ -135,7 +135,7 @@ impl TypedFunctionDeclaration {
 
         let namespace = &mut temp_root[mod_path];
         for FunctionParameter { name, type_id, .. } in parameters.clone() {
-            namespace.insert(
+            namespace.insert_symbol(
                 name.clone(),
                 TypedDeclaration::VariableDeclaration(TypedVariableDeclaration {
                     name: name.clone(),
