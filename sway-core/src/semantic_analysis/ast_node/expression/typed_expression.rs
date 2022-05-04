@@ -646,7 +646,7 @@ impl TypedExpression {
         mod_path: &namespace::Path,
     ) -> CompileResult<TypedExpression> {
         let mut errors = vec![];
-        let exp = match root.get_symbol(mod_path, &name).value {
+        let exp = match root.resolve_symbol(mod_path, &name).value {
             Some(TypedDeclaration::VariableDeclaration(TypedVariableDeclaration {
                 body, ..
             })) => TypedExpression {
@@ -711,7 +711,7 @@ impl TypedExpression {
             ..
         } = arguments;
         let function_declaration = check!(
-            root.get_call_path(mod_path, &name).cloned(),
+            root.resolve_call_path(mod_path, &name).cloned(),
             return err(warnings, errors),
             warnings,
             errors
@@ -1395,7 +1395,7 @@ impl TypedExpression {
                 warnings,
                 errors
             );
-            match root.get_symbol(&module_path, &call_path.suffix).value {
+            match root.resolve_symbol(&module_path, &call_path.suffix).value {
                 Some(TypedDeclaration::StructDeclaration(decl)) => decl.clone(),
                 Some(_) => {
                     errors.push(CompileError::DeclaredNonStructAsStruct {
@@ -1838,7 +1838,8 @@ impl TypedExpression {
             .check_submodule_mut(enum_mod_path)
             .ok(&mut warnings, &mut errors)
             .map(|_| ())
-            .and_then(|_| root.find_enum(&abs_enum_mod_path, enum_name).cloned())
+            .and_then(|_| root.resolve_symbol(&abs_enum_mod_path, enum_name).value)
+            .and_then(|decl| decl.as_enum().cloned())
         {
             // Check for ambiguity between this enum name and a module name.
             if is_module {
@@ -1876,7 +1877,7 @@ impl TypedExpression {
                 .chain(&call_path.prefixes)
                 .cloned()
                 .collect();
-            let decl = match root.get_symbol(&path, &call_path.suffix).value {
+            let decl = match root.resolve_symbol(&path, &call_path.suffix).value {
                 Some(decl) => decl.clone(),
                 None => {
                     errors.push(symbol_not_found(&call_path.suffix));
@@ -1986,7 +1987,7 @@ impl TypedExpression {
         );
         // look up the call path and get the declaration it references
         let abi = check!(
-            root.get_call_path(mod_path, &abi_name).cloned(),
+            root.resolve_call_path(mod_path, &abi_name).cloned(),
             return err(warnings, errors),
             warnings,
             errors
@@ -2012,7 +2013,7 @@ impl TypedExpression {
                     // look up the call path and get the declaration it references
                     AbiName::Known(abi_name) => {
                         let decl = check!(
-                            root.get_call_path(mod_path, &abi_name).cloned(),
+                            root.resolve_call_path(mod_path, &abi_name).cloned(),
                             return err(warnings, errors),
                             warnings,
                             errors
@@ -2663,7 +2664,7 @@ fn check_enum_scrutinee_type(
     let enum_variant = call_path.suffix.clone();
     let call_path = call_path.rshift();
     let decl: TypedDeclaration = check!(
-        root.get_call_path(mod_path, &call_path).cloned(),
+        root.resolve_call_path(mod_path, &call_path).cloned(),
         return err(warnings, errors),
         warnings,
         errors
