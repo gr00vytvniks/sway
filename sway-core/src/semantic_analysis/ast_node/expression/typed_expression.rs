@@ -642,7 +642,7 @@ impl TypedExpression {
     pub(crate) fn type_check_variable_expression(
         name: Ident,
         span: Span,
-        root: &Namespace,
+        root: &namespace::Root,
         mod_path: &namespace::Path,
     ) -> CompileResult<TypedExpression> {
         let mut errors = vec![];
@@ -668,7 +668,9 @@ impl TypedExpression {
             Some(TypedDeclaration::AbiDeclaration(decl)) => TypedExpression {
                 return_type: decl.as_type(),
                 is_constant: IsConstant::Yes,
-                expression: TypedExpressionVariant::AbiName(AbiName::Known(decl.name.into())),
+                expression: TypedExpressionVariant::AbiName(AbiName::Known(
+                    decl.name.clone().into(),
+                )),
                 span,
             },
             Some(a) => {
@@ -709,7 +711,7 @@ impl TypedExpression {
             ..
         } = arguments;
         let function_declaration = check!(
-            root.get_call_path(mod_path, &name),
+            root.get_call_path(mod_path, &name).cloned(),
             return err(warnings, errors),
             warnings,
             errors
@@ -816,8 +818,8 @@ impl TypedExpression {
     fn type_check_code_block(
         contents: CodeBlock,
         span: Span,
-        init: &Namespace,
-        root: &mut Namespace,
+        init: &namespace::Module,
+        root: &mut namespace::Root,
         mod_path: &namespace::Path,
         type_annotation: TypeId,
         help_text: &'static str,
@@ -940,7 +942,7 @@ impl TypedExpression {
 
         // calculate the return type of the variable by checking the enum variant's return type
 
-        temp_root[mod_path].insert(
+        temp_root[mod_path].insert_symbol(
             variable_to_assign.clone(),
             TypedDeclaration::VariableDeclaration(TypedVariableDeclaration {
                 name: variable_to_assign.clone(),
@@ -1292,8 +1294,8 @@ impl TypedExpression {
     fn type_check_asm_expression(
         asm: AsmExpression,
         span: Span,
-        init: &Namespace,
-        root: &mut Namespace,
+        init: &namespace::Module,
+        root: &mut namespace::Root,
         mod_path: &namespace::Path,
         self_type: TypeId,
         build_config: &BuildConfig,
@@ -1369,8 +1371,8 @@ impl TypedExpression {
         call_path: CallPath,
         type_arguments: Vec<TypeArgument>,
         fields: Vec<StructExpressionField>,
-        init: &Namespace,
-        root: &mut Namespace,
+        init: &namespace::Module,
+        root: &mut namespace::Root,
         mod_path: &namespace::Path,
         self_type: TypeId,
         build_config: &BuildConfig,
@@ -1388,13 +1390,13 @@ impl TypedExpression {
             .collect();
         let decl = {
             check!(
-                root.find_module_relative(&module_path),
+                root.check_submodule(&module_path),
                 return err(warnings, errors),
                 warnings,
                 errors
             );
             match root.get_symbol(&module_path, &call_path.suffix).value {
-                Some(TypedDeclaration::StructDeclaration(decl)) => decl,
+                Some(TypedDeclaration::StructDeclaration(decl)) => decl.clone(),
                 Some(_) => {
                     errors.push(CompileError::DeclaredNonStructAsStruct {
                         name: call_path.suffix.clone(),
@@ -1534,8 +1536,8 @@ impl TypedExpression {
         prefix: Box<Expression>,
         span: Span,
         field_to_access: Ident,
-        init: &Namespace,
-        root: &mut Namespace,
+        init: &namespace::Module,
+        root: &mut namespace::Root,
         mod_path: &namespace::Path,
         self_type: TypeId,
         build_config: &BuildConfig,
@@ -1607,8 +1609,8 @@ impl TypedExpression {
     fn type_check_tuple(
         fields: Vec<Expression>,
         span: Span,
-        init: &Namespace,
-        root: &mut Namespace,
+        init: &namespace::Module,
+        root: &mut namespace::Root,
         mod_path: &namespace::Path,
         type_annotation: TypeId,
         self_type: TypeId,
@@ -1724,8 +1726,8 @@ impl TypedExpression {
         index: usize,
         index_span: Span,
         span: Span,
-        init: &Namespace,
-        root: &mut Namespace,
+        init: &namespace::Module,
+        root: &mut namespace::Root,
         mod_path: &namespace::Path,
         self_type: TypeId,
         build_config: &BuildConfig,
@@ -1795,8 +1797,8 @@ impl TypedExpression {
         span: Span,
         args: Vec<Expression>,
         type_arguments: Vec<TypeArgument>,
-        init: &Namespace,
-        root: &mut Namespace,
+        init: &namespace::Module,
+        root: &mut namespace::Root,
         mod_path: &namespace::Path,
         self_type: TypeId,
         build_config: &BuildConfig,
@@ -1825,7 +1827,7 @@ impl TypedExpression {
         // First, check if this could be a module. We check first so that we can check for
         // ambiguity in the following enum check.
         let is_module = root[mod_path]
-            .find_module_relative(&call_path.prefixes)
+            .check_submodule(&call_path.prefixes)
             .ok(&mut probe_warnings, &mut probe_errors)
             .is_some();
 
@@ -1833,10 +1835,10 @@ impl TypedExpression {
         let (enum_name, enum_mod_path) = call_path.prefixes.split_last().expect("empty call path");
         let abs_enum_mod_path: Vec<_> = mod_path.iter().chain(enum_mod_path).cloned().collect();
         let exp = if let Some(enum_decl) = root[mod_path]
-            .find_module_relative_mut(enum_mod_path)
+            .check_submodule_mut(enum_mod_path)
             .ok(&mut warnings, &mut errors)
             .map(|_| ())
-            .and_then(|_| root.find_enum(&abs_enum_mod_path, enum_name))
+            .and_then(|_| root.find_enum(&abs_enum_mod_path, enum_name).cloned())
         {
             // Check for ambiguity between this enum name and a module name.
             if is_module {
@@ -1865,7 +1867,7 @@ impl TypedExpression {
 
         // Otherwise, our prefix should point to some module ending with an enum or function.
         } else if root[mod_path]
-            .find_module_relative_mut(&call_path.prefixes)
+            .check_submodule_mut(&call_path.prefixes)
             .ok(&mut probe_warnings, &mut probe_errors)
             .is_some()
         {
@@ -1875,7 +1877,7 @@ impl TypedExpression {
                 .cloned()
                 .collect();
             let decl = match root.get_symbol(&path, &call_path.suffix).value {
-                Some(decl) => decl,
+                Some(decl) => decl.clone(),
                 None => {
                     errors.push(symbol_not_found(&call_path.suffix));
                     return err(warnings, errors);
@@ -1948,8 +1950,8 @@ impl TypedExpression {
         abi_name: CallPath,
         address: Box<Expression>,
         span: Span,
-        init: &Namespace,
-        root: &mut Namespace,
+        init: &namespace::Module,
+        root: &mut namespace::Root,
         mod_path: &namespace::Path,
         self_type: TypeId,
         build_config: &BuildConfig,
@@ -1984,7 +1986,7 @@ impl TypedExpression {
         );
         // look up the call path and get the declaration it references
         let abi = check!(
-            root.get_call_path(mod_path, &abi_name),
+            root.get_call_path(mod_path, &abi_name).cloned(),
             return err(warnings, errors),
             warnings,
             errors
@@ -2010,7 +2012,7 @@ impl TypedExpression {
                     // look up the call path and get the declaration it references
                     AbiName::Known(abi_name) => {
                         let decl = check!(
-                            root.get_call_path(mod_path, &abi_name),
+                            root.get_call_path(mod_path, &abi_name).cloned(),
                             return err(warnings, errors),
                             warnings,
                             errors
@@ -2108,8 +2110,8 @@ impl TypedExpression {
     fn type_check_array(
         contents: Vec<Expression>,
         span: Span,
-        init: &Namespace,
-        root: &mut Namespace,
+        init: &namespace::Module,
+        root: &mut namespace::Root,
         mod_path: &namespace::Path,
         self_type: TypeId,
         build_config: &BuildConfig,
@@ -2309,8 +2311,8 @@ impl TypedExpression {
     fn type_check_delayed_resolution(
         variant: DelayedResolutionVariant,
         span: Span,
-        init: &Namespace,
-        root: &mut Namespace,
+        init: &namespace::Module,
+        root: &mut namespace::Root,
         mod_path: &namespace::Path,
         self_type: TypeId,
         build_config: &BuildConfig,
@@ -2627,7 +2629,7 @@ impl TypedExpression {
 
 fn check_scrutinee_type(
     scrutinee: &Scrutinee,
-    root: &mut Namespace,
+    root: &mut namespace::Root,
     mod_path: &namespace::Path,
 ) -> CompileResult<(TypeId, TypedEnumVariant)> {
     let mut warnings = vec![];
@@ -2653,7 +2655,7 @@ fn check_scrutinee_type(
 
 fn check_enum_scrutinee_type(
     call_path: &CallPath,
-    root: &mut Namespace,
+    root: &mut namespace::Root,
     mod_path: &namespace::Path,
 ) -> CompileResult<(TypedEnumDeclaration, TypedEnumVariant)> {
     let mut warnings = vec![];
@@ -2661,7 +2663,7 @@ fn check_enum_scrutinee_type(
     let enum_variant = call_path.suffix.clone();
     let call_path = call_path.rshift();
     let decl: TypedDeclaration = check!(
-        root.get_call_path(mod_path, &call_path),
+        root.get_call_path(mod_path, &call_path).cloned(),
         return err(warnings, errors),
         warnings,
         errors
@@ -2706,8 +2708,8 @@ mod tests {
     use super::*;
 
     fn do_type_check(expr: Expression, type_annotation: TypeId) -> CompileResult<TypedExpression> {
-        let init = Namespace::default();
-        let mut root = init.clone();
+        let init = namespace::Module::default();
+        let mut root = namespace::Root::from(init.clone());
         let mod_path = &[];
         let self_type = insert_type(TypeInfo::Unknown);
         let build_config = BuildConfig {
