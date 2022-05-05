@@ -1,6 +1,7 @@
 pub use {
     crate::{
         assignable::Assignable,
+        attribute::{Attribute, AttributeDecl},
         brackets::{AngleBrackets, Braces, Parens, SquareBrackets},
         dependency::Dependency,
         error::{ParseError, ParseErrorKind},
@@ -31,6 +32,7 @@ pub use {
         punctuated::Punctuated,
         statement::{Statement, StatementLet},
         token::{Delimiter, Group, Punct, PunctKind, Spacing, TokenStream, TokenTree},
+        toplevel::TopLevelStatement,
         ty::Ty,
         where_clause::{WhereBound, WhereClause},
     },

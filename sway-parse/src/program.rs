@@ -4,13 +4,13 @@ pub struct Program {
     pub kind: ProgramKind,
     pub semicolon_token: SemicolonToken,
     pub dependencies: Vec<Dependency>,
-    pub items: Vec<Item>,
+    pub top_level_statements: Vec<TopLevelStatement>,
 }
 
 impl Program {
     pub fn span(&self) -> Span {
         let start = self.kind.span();
-        let end = match self.items.last() {
+        let end = match self.top_level_statements.last() {
             Some(item) => item.span(),
             None => match self.dependencies.last() {
                 Some(dependency) => dependency.span(),
@@ -82,12 +82,12 @@ impl ParseToEnd for Program {
             let dependency = parser.parse()?;
             dependencies.push(dependency);
         }
-        let (items, consumed) = parser.parse_to_end()?;
+        let (top_level_statements, consumed) = parser.parse_to_end()?;
         let program = Program {
             kind,
             semicolon_token,
             dependencies,
-            items,
+            top_level_statements,
         };
         Ok((program, consumed))
     }

@@ -262,8 +262,8 @@ pub fn program_to_sway_parse_tree(
                 })
                 .collect()
         };
-        for item in program.items {
-            let ast_nodes = item_to_ast_nodes(ec, item)?;
+        for top_level_stmt in program.top_level_statements {
+            let ast_nodes = item_to_ast_nodes(ec, top_level_stmt.item)?;
             root_nodes.extend(ast_nodes);
         }
         root_nodes
