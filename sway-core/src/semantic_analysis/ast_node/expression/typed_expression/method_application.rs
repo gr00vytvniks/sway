@@ -23,6 +23,8 @@ pub(crate) fn type_check_method_application(
     dead_code_graph: &mut ControlFlowGraph,
     opts: TCOpts,
 ) -> CompileResult<TypedExpression> {
+    dbg!(&method_name);
+    dbg!(&arguments);
     let mut warnings = vec![];
     let mut errors = vec![];
     let mut args_buf = VecDeque::new();
@@ -53,6 +55,9 @@ pub(crate) fn type_check_method_application(
             ref type_name,
             ref type_name_span,
         } => {
+            dbg!(&call_path);
+            dbg!(&type_name);
+            dbg!(&type_name_span);
             let (ty, type_name_span): (TypeInfo, Span) = match (type_name, type_name_span) {
                 (Some(type_name), Some(type_name_span)) => {
                     (type_name.clone(), type_name_span.clone())

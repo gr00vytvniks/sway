@@ -1322,8 +1322,29 @@ fn expr_to_expression(ec: &mut ErrorContext, expr: Expr) -> Result<Expression, E
             };
             match storage_access_field_names_opt {
                 Some(field_names) => {
-                    let field_names = field_names.into_iter().rev().cloned().collect();
-                    Expression::StorageAccess { field_names, span }
+                    dbg!(&field_names);
+                    let full_bytes = [0u8; 32];
+                    Expression::MethodApplication {
+                        method_name: MethodName::FromType {
+                            call_path: CallPath {
+                                prefixes: vec![
+                                    Ident::new_with_override("core", span.clone()),
+                                    Ident::new_with_override("ops", span.clone()),
+                                ],
+                                suffix: Ident::new_with_override("read", span.clone()),
+                                is_absolute: false,
+                            },
+                            type_name: Some(TypeInfo::UnsignedInteger(IntegerBits::SixtyFour)),
+                            type_name_span: Some(span.clone()),
+                        },
+                        contract_call_params: Vec::new(),
+                        arguments: vec![Expression::Literal {
+                            value: Literal::B256(full_bytes),
+                            span: span.clone(),
+                        }],
+                        type_arguments: Vec::new(),
+                        span: span.clone(),
+                    }
                 }
                 None => Expression::SubfieldExpression {
                     prefix: Box::new(expr_to_expression(ec, *target)?),
