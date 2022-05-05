@@ -1322,8 +1322,12 @@ fn expr_to_expression(ec: &mut ErrorContext, expr: Expr) -> Result<Expression, E
             };
             match storage_access_field_names_opt {
                 Some(field_names) => {
-                    dbg!(&field_names);
-                    let full_bytes = [0u8; 32];
+                    let field_names = field_names.into_iter().rev().cloned().collect();
+                    Expression::StorageAccess { field_names, span }
+                    /*dbg!(&field_names);
+                    let full_bytes = [0u8; 32]; // todo get key here
+                    // Need to get TypeInfo:
+
                     Expression::MethodApplication {
                         method_name: MethodName::FromType {
                             call_path: CallPath {
@@ -1344,7 +1348,7 @@ fn expr_to_expression(ec: &mut ErrorContext, expr: Expr) -> Result<Expression, E
                         }],
                         type_arguments: Vec::new(),
                         span: span.clone(),
-                    }
+                    }*/
                 }
                 None => Expression::SubfieldExpression {
                     prefix: Box::new(expr_to_expression(ec, *target)?),

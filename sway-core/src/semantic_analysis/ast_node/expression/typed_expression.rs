@@ -1615,13 +1615,26 @@ impl TypedExpression {
     ) -> CompileResult<TypedExpression> {
         let mut warnings = vec![];
         let mut errors = vec![];
-        if !arguments.namespace.has_storage_declared() {
+        let checkee_copy = arguments.checkee.clone();
+        let TypeCheckArguments {
+            checkee: field_names,
+            namespace,
+            crate_namespace,
+            self_type,
+            build_config,
+            dead_code_graph,
+            opts,
+            ..
+        } = arguments;
+
+
+        if namespace.has_storage_declared() {
             errors.push(CompileError::NoDeclaredStorage { span: span.clone() });
             return err(warnings, errors);
         }
 
         let storage_fields = check!(
-            arguments.namespace.get_storage_field_descriptors(),
+            namespace.get_storage_field_descriptors(),
             return err(warnings, errors),
             warnings,
             errors
@@ -1629,22 +1642,43 @@ impl TypedExpression {
 
         // Do all namespace checking here!
         let (storage_access, return_type) = check!(
-            arguments
-                .namespace
-                .apply_storage_load(arguments.checkee, &storage_fields),
+                namespace
+                .apply_storage_load(checkee_copy, &storage_fields),
             return err(warnings, errors),
             warnings,
             errors
         );
-        ok(
-            TypedExpression {
-                expression: TypedExpressionVariant::StorageAccess(storage_access),
-                return_type,
-                is_constant: IsConstant::No,
-                span: span.clone(),
+
+        let method_name = MethodName::FromType {
+            call_path: CallPath {
+                prefixes: vec![
+                    Ident::new_with_override("core", span.clone()),
+                    Ident::new_with_override("ops", span.clone()),
+                ],
+                suffix: Ident::new_with_override("read", span.clone()),
+                is_absolute: false,
             },
-            warnings,
-            errors,
+            type_name: Some(TypeInfo::UnsignedInteger(IntegerBits::SixtyFour)),
+            type_name_span: Some(span.clone()),
+        };
+       
+        let full_bytes = [0u8; 32]; // todo get key here
+
+        type_check_method_application(
+            method_name,
+            vec![],
+            vec![Expression::Literal {
+                value: Literal::B256(full_bytes),
+                span: span.clone(),
+            }],
+            vec![],
+            span.clone(),
+            namespace,
+            crate_namespace,
+            self_type,
+            build_config,
+            dead_code_graph,
+            opts,
         )
     }
 
