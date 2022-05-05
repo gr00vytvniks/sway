@@ -136,7 +136,7 @@ impl TypedParseTree {
     ///   the accumulated `root` namespace is returned inside `Self`.
     /// - `mod_path` is an absolute path into the `root` that represents the current module we are
     ///   type-checking.
-    pub(crate) fn type_check(
+    pub fn type_check(
         parsed: ParseTree,
         init: &namespace::Module,
         root: &mut namespace::Root,

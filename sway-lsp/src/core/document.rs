@@ -84,6 +84,8 @@ impl TextDocument {
         self.clear_tokens();
         self.clear_hash_maps();
 
+        self.parse_typed_tokens_from_text();
+
         match self.parse_tokens_from_text() {
             Ok((tokens, diagnostics)) => {
                 self.store_tokens(tokens);
@@ -107,6 +109,51 @@ impl TextDocument {
 
 // private methods
 impl TextDocument {
+    fn parse_typed_tokens_from_text(&self) {
+        use sway_core::{
+            BuildConfig,
+            CompileResult,
+            TypedParseTree,
+            semantic_analysis::{
+                namespace,
+            },
+        };
+
+        let text = Arc::from(self.get_text());
+        let parse_tree = parse(text, None).value.unwrap();
+
+        let init_ns = namespace::Module::default();
+        let mut root_ns = namespace::Root::from(init_ns.clone());
+        let mod_path = &[];
+        let tree_type = &parse_tree.tree_type;
+        let file_name = std::path::PathBuf::from(self.get_uri());
+        let build_config = BuildConfig::root_from_file_name_and_manifest_path(
+            file_name,
+            Default::default(),
+        );
+        let mut dead_code_graph = Default::default();
+
+        let CompileResult {
+            value: typed_parse_tree_result,
+            warnings: new_warnings,
+            errors: new_errors,
+        } = TypedParseTree::type_check(
+            parse_tree.tree,
+            &init_ns,
+            &mut root_ns,
+            mod_path,
+            tree_type,
+            &build_config,
+            &mut dead_code_graph,
+        );
+        eprintln!("typed_parse_tree_result: {:#?}", typed_parse_tree_result);
+
+        if let Some(typed_parse_tree) = typed_parse_tree_result {
+            eprintln!("typed_parse_tree: {:#?}", typed_parse_tree);
+        }
+
+    }
+
     fn parse_tokens_from_text(&self) -> Result<(Vec<Token>, Vec<Diagnostic>), Vec<Diagnostic>> {
         let text = Arc::from(self.get_text());
         let parsed_result = parse(text, None);
