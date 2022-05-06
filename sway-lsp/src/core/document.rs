@@ -135,8 +135,8 @@ impl TextDocument {
 
         let CompileResult {
             value: typed_parse_tree_result,
-            warnings: new_warnings,
-            errors: new_errors,
+            warnings: _new_warnings,
+            errors: _new_errors,
         } = TypedParseTree::type_check(
             parse_tree.tree,
             &init_ns,
@@ -146,10 +146,19 @@ impl TextDocument {
             &build_config,
             &mut dead_code_graph,
         );
-        eprintln!("typed_parse_tree_result: {:#?}", typed_parse_tree_result);
+        //eprintln!("typed_parse_tree_result: {:#?}", typed_parse_tree_result);
 
         if let Some(typed_parse_tree) = typed_parse_tree_result {
-            eprintln!("typed_parse_tree: {:#?}", typed_parse_tree);
+            match typed_parse_tree {
+                TypedParseTree::Script{ main_function, namespace, declarations, all_nodes } => {
+                    //eprintln!("main_function: {:#?}", main_function);
+                    //eprintln!("namespace: {:#?}", namespace);
+                    eprintln!("declarations: {:#?}", declarations);
+                    //eprintln!("all_nodes: {:#?}", all_nodes);
+                }
+                _ => (),
+            }
+            
         }
 
     }
