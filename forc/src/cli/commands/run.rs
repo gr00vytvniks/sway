@@ -64,7 +64,7 @@ pub struct Command {
     pub pretty_print: bool,
 
     /// Print the outputs from the node in detail
-    #[clap(long = "verbose",short = 'v')]
+    #[clap(long = "verbose", short = 'v')]
     pub verbose: bool,
 
     /// 32-byte contract ID that will be called during the transaction.
