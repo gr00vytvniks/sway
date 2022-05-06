@@ -7,6 +7,7 @@ use forc_pkg::{fuel_core_not_running, ManifestFile};
 use fuel_gql_client::client::FuelClient;
 use fuel_tx::Transaction;
 use futures::TryFutureExt;
+use std::fmt::Write;
 use std::path::PathBuf;
 use std::str::FromStr;
 use sway_core::TreeType;
@@ -59,7 +60,7 @@ pub async fn run(command: RunCommand) -> Result<Vec<fuel_tx::Receipt>> {
             Some(network) => &network.url,
             _ => &command.node_url,
         };
-        try_send_tx(node_url, &tx, command.pretty_print).await
+        try_send_tx(node_url, &tx, command.pretty_print, command.verbose).await
     }
 }
 
@@ -67,11 +68,12 @@ async fn try_send_tx(
     node_url: &str,
     tx: &Transaction,
     pretty_print: bool,
+    verbose: bool,
 ) -> Result<Vec<fuel_tx::Receipt>> {
     let client = FuelClient::new(node_url)?;
 
     match client.health().await {
-        Ok(_) => send_tx(&client, tx, pretty_print).await,
+        Ok(_) => send_tx(&client, tx, pretty_print, verbose).await,
         Err(_) => Err(fuel_core_not_running(node_url)),
     }
 }
@@ -80,6 +82,7 @@ async fn send_tx(
     client: &FuelClient,
     tx: &Transaction,
     pretty_print: bool,
+    verbose: bool,
 ) -> Result<Vec<fuel_tx::Receipt>> {
     let id = format!("{:#x}", tx.id());
     match client
@@ -89,9 +92,21 @@ async fn send_tx(
     {
         Ok(logs) => {
             if pretty_print {
-                println!("{:#?}", logs);
+                if verbose {
+                    println!("{:#?}", logs);
+                }else {
+                    for rec in logs.clone() {
+                        println!("{}",format_receipt_output(rec, true));
+                    } 
+                }
             } else {
-                println!("{:?}", logs);
+                if verbose {
+                    println!("{:?}", logs); 
+                }else {
+                    for rec in logs.clone() {
+                        println!("{}",format_receipt_output(rec,false));
+                    }
+                }
             }
             Ok(logs)
         }
@@ -162,4 +177,61 @@ fn get_tx_inputs_and_outputs(
         .map(construct_output_from_contract)
         .collect::<Vec<_>>();
     (inputs, outputs)
+}
+
+fn format_receipt_output(rec : fuel_tx::Receipt, pretty: bool) -> String {
+    let rec_clone = rec.clone();
+    let mut rec_value = serde_json::to_value(&rec_clone).unwrap();
+    match rec {
+        fuel_tx::Receipt::LogData { id:rec_id, ra:_, rb:_, ptr:_, len:_, digest:rec_digest, data:rec_data, pc:_, is:_ } => {
+            rec_value.pointer_mut("/LogData/data").map(|v| *v = format_field_to_hex(rec_data).into());
+            rec_value.pointer_mut("/LogData/digest").map(|v| *v = format_field_to_hex(rec_digest.to_vec()).into());
+            rec_value.pointer_mut("/LogData/id").map(|v| *v = format_field_to_hex(rec_id.to_vec()).into());
+        },
+        fuel_tx::Receipt::ReturnData { id:rec_id, ptr:_, len:_, digest:rec_digest, data:rec_data, pc:_, is:_ } => {
+            rec_value.pointer_mut("/ReturnData/data").map(|v| *v = format_field_to_hex(rec_data).into());
+            rec_value.pointer_mut("/ReturnData/digest").map(|v| *v = format_field_to_hex(rec_digest.to_vec()).into());
+            rec_value.pointer_mut("/ReturnData/id").map(|v| *v = format_field_to_hex(rec_id.to_vec()).into());
+        },
+        fuel_tx::Receipt::Call { id:rec_id, to:rec_to, amount:_, asset_id:rec_asset_id, gas:_, param1:_, param2:_, pc:_, is:_ } => {
+            rec_value.pointer_mut("/Call/id").map(|v| *v = format_field_to_hex(rec_id.to_vec()).into());
+            rec_value.pointer_mut("/Call/to").map(|v| *v = format_field_to_hex(rec_to.to_vec()).into());
+            rec_value.pointer_mut("/Call/asset_id").map(|v| *v = format_field_to_hex(rec_asset_id.to_vec()).into());
+        },
+        fuel_tx::Receipt::Transfer { id: rec_id, to: rec_to, amount:_, asset_id:rec_asset_id, pc:_, is:_ } => {
+            rec_value.pointer_mut("/Transfer/id").map(|v| *v = format_field_to_hex(rec_id.to_vec()).into());
+            rec_value.pointer_mut("/Transfer/to").map(|v| *v = format_field_to_hex(rec_to.to_vec()).into());
+            rec_value.pointer_mut("/Transfer/asset_id").map(|v| *v = format_field_to_hex(rec_asset_id.to_vec()).into()); 
+        },
+        fuel_tx::Receipt::TransferOut { id: rec_id, to: rec_to, amount:_, asset_id:rec_asset_id, pc:_, is:_ } => {
+            rec_value.pointer_mut("/TransferOut/id").map(|v| *v = format_field_to_hex(rec_id.to_vec()).into());
+            rec_value.pointer_mut("/TransferOut/to").map(|v| *v = format_field_to_hex(rec_to.to_vec()).into());
+            rec_value.pointer_mut("/TransferOut/asset_id").map(|v| *v = format_field_to_hex(rec_asset_id.to_vec()).into()); 
+        }
+        fuel_tx::Receipt::Return { id:rec_id, val:_, pc:_, is:_ } => {
+            rec_value.pointer_mut("/Return/id").map(|v| *v = format_field_to_hex(rec_id.to_vec()).into()); 
+        },
+        fuel_tx::Receipt::Panic { id:rec_id, reason:_, pc:_, is:_ } => {
+            rec_value.pointer_mut("/Panic/id").map(|v| *v = format_field_to_hex(rec_id.to_vec()).into()); 
+        },
+        fuel_tx::Receipt::Revert { id:rec_id, ra:_, pc:_, is:_ } => {
+            rec_value.pointer_mut("/Revert/id").map(|v| *v = format_field_to_hex(rec_id.to_vec()).into()); 
+        },
+        fuel_tx::Receipt::Log { id:rec_id, ra:_, rb:_, rc:_, rd:_, pc:_, is:_ } => {
+            rec_value.pointer_mut("/Log/id").map(|v| *v = format_field_to_hex(rec_id.to_vec()).into()); 
+        },
+        _ => {},
+    };
+    match pretty {
+        true => serde_json::to_string_pretty(&rec_value).unwrap(),
+        false => serde_json::to_string(&rec_value).unwrap(),
+    }
+}
+
+fn format_field_to_hex(rec_data: Vec<u8>) -> String {
+    let mut formatted_rec_data = String::new();
+    for byte in rec_data {
+        write!(&mut formatted_rec_data, "{:02x}", byte).expect("Unable to write");
+    }
+    formatted_rec_data
 }
