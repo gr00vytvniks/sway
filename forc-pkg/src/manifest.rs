@@ -25,22 +25,23 @@ pub enum ManifestFile {
 impl ManifestFile {
     /// Returns a `PackageManifestFile` if the path is within a package directory, otherwise
     /// returns a `WorkspaceManifestFile` if within a workspace directory.
-    pub fn from_dir(manifest_dir: &Path) -> Result<Self> {
+    pub fn from_dir(manifest_dir: &Path) -> Result<(Self, Vec<String>)> {
         let maybe_pkg_manifest = PackageManifestFile::from_dir(manifest_dir);
-        let manifest_file = if let Err(e) = maybe_pkg_manifest {
+        let (manifest_file, warnings) = if let Err(e) = maybe_pkg_manifest {
             if e.to_string().contains("missing field `project`") {
                 // This might be a workspace manifest file
-                let workspace_manifest_file = WorkspaceManifestFile::from_dir(manifest_dir)?;
-                ManifestFile::Workspace(workspace_manifest_file)
+                let (workspace_manifest_file, warnings) =
+                    WorkspaceManifestFile::from_dir(manifest_dir)?;
+                (ManifestFile::Workspace(workspace_manifest_file), warnings)
             } else {
                 bail!("{}", e)
             }
-        } else if let Ok(pkg_manifest) = maybe_pkg_manifest {
-            ManifestFile::Package(Box::new(pkg_manifest))
+        } else if let Ok((pkg_manifest, warnings)) = maybe_pkg_manifest {
+            (ManifestFile::Package(Box::new(pkg_manifest)), warnings)
         } else {
             bail!("Cannot find a valid `Forc.toml` at {:?}", manifest_dir)
         };
-        Ok(manifest_file)
+        Ok((manifest_file, warnings))
     }
 
     /// Returns a `PackageManifestFile` if the path is pointing to package manifest, otherwise
