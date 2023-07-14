@@ -958,7 +958,7 @@ fn validate_dep(
     })?;
 
     // Ensure the manifest is accessible.
-    let dep_manifest = PackageManifestFile::from_dir(&dep_path)?;
+    let (dep_manifest, warnings) = PackageManifestFile::from_dir(&dep_path)?;
 
     // Check that the dependency's source matches the entry in the parent manifest.
     let dep_entry = node_manifest

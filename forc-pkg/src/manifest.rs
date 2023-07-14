@@ -91,7 +91,7 @@ impl ManifestFile {
                 // Check if this package is in a workspace, in that case insert all member manifests
                 if let Some(workspace_manifest_file) = pkg_manifest_file.workspace()? {
                     for member_manifest in workspace_manifest_file.member_pkg_manifests()? {
-                        let member_manifest =
+                        let (member_manifest, warnings) =
                             member_manifest.with_context(|| "Invalid member manifest")?;
                         member_manifest_files
                             .insert(member_manifest.project.name.clone(), member_manifest);
@@ -103,7 +103,7 @@ impl ManifestFile {
             }
             ManifestFile::Workspace(workspace_manifest_file) => {
                 for member_manifest in workspace_manifest_file.member_pkg_manifests()? {
-                    let member_manifest =
+                    let (member_manifest, warnings) =
                         member_manifest.with_context(|| "Invalid member manifest")?;
                     member_manifest_files
                         .insert(member_manifest.project.name.clone(), member_manifest);
@@ -439,7 +439,7 @@ impl PackageManifestFile {
             None => return Ok(None),
             Some(dir) => dir,
         };
-        let ws_manifest = match WorkspaceManifestFile::from_dir(parent_dir) {
+        let (ws_manifest, warnings) = match WorkspaceManifestFile::from_dir(parent_dir) {
             Ok(manifest) => manifest,
             Err(e) => {
                 // Check if the error is missing workspace manifest file. Do not return that error if that
