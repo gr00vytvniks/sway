@@ -563,7 +563,7 @@ impl BuildPlan {
             std::env::current_dir()?
         };
 
-        let manifest_file = ManifestFile::from_dir(&manifest_dir)?;
+        let (manifest_file, warnings) = ManifestFile::from_dir(&manifest_dir)?;
         let member_manifests = manifest_file.member_manifests()?;
         // Check if we have members to build so that we are not trying to build an empty workspace.
         if member_manifests.is_empty() {
@@ -1248,7 +1248,7 @@ fn pkg_graph_to_manifest_map(
                 e
             )
         })?;
-        let dep_manifest = PackageManifestFile::from_dir(&dep_path)?;
+        let (dep_manifest, warnings) = PackageManifestFile::from_dir(&dep_path)?;
         let dep = &graph[dep_node];
         manifest_map.insert(dep.id(), dep_manifest);
     }
