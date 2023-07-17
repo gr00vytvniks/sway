@@ -29,7 +29,7 @@ impl source::Pin for Source {
 
 impl source::Fetch for Pinned {
     fn fetch(&self, _ctx: source::PinCtx, local: &Path) -> anyhow::Result<PackageManifestFile> {
-        let manifest = PackageManifestFile::from_dir(local)?;
+        let (manifest, warnings) = PackageManifestFile::from_dir(local)?;
         Ok(manifest)
     }
 }
