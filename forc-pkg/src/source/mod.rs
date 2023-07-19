@@ -37,7 +37,7 @@ trait Pin {
 
 /// Fetch (and optionally cache) a pinned instance of this source to the given path.
 trait Fetch {
-    fn fetch(&self, ctx: PinCtx, local: &Path) -> Result<PackageManifestFile>;
+    fn fetch(&self, ctx: PinCtx, local: &Path) -> Result<(PackageManifestFile, Vec<String>)>;
 }
 
 /// Given a parent manifest, return the canonical, local path for this source as a dependency.
@@ -267,7 +267,8 @@ impl Source {
             let (pinned, fetch_path) = source.pin(ctx.clone())?;
             let id = PinnedId::new(ctx.name(), &Pinned::from(pinned.clone()));
             if let hash_map::Entry::Vacant(entry) = manifests.entry(id) {
-                entry.insert(pinned.fetch(ctx, &fetch_path)?);
+                let (pkg_manifest_file, _warnings) = pinned.fetch(ctx, &fetch_path)?;
+                entry.insert(pkg_manifest_file);
             }
             Ok(pinned)
         }

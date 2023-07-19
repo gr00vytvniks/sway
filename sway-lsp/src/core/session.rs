@@ -144,7 +144,7 @@ impl Session {
         let locked = false;
         let offline = false;
 
-        let manifest = ManifestFile::from_dir(&manifest_dir).map_err(|_| {
+        let (manifest, _) = ManifestFile::from_dir(&manifest_dir).map_err(|_| {
             DocumentError::ManifestFileNotFound {
                 dir: uri.path().into(),
             }

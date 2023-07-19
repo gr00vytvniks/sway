@@ -27,7 +27,11 @@ impl source::Pin for Source {
 }
 
 impl source::Fetch for Pinned {
-    fn fetch(&self, _ctx: source::PinCtx, _local: &Path) -> anyhow::Result<PackageManifestFile> {
+    fn fetch(
+        &self,
+        _ctx: source::PinCtx,
+        _local: &Path,
+    ) -> anyhow::Result<(PackageManifestFile, Vec<String>)> {
         bail!("registry dependencies are not yet supported");
     }
 }

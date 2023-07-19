@@ -2721,7 +2721,7 @@ fn test_root_pkg_order() {
         .parent()
         .unwrap()
         .join("test/src/e2e_vm_tests/test_programs/should_pass/forc/workspace_building/");
-    let manifest_file = ManifestFile::from_dir(&manifest_dir).unwrap();
+    let (manifest_file, _) = ManifestFile::from_dir(&manifest_dir).unwrap();
     let member_manifests = manifest_file.member_manifests().unwrap();
     let lock_path = manifest_file.lock_path().unwrap();
     let build_plan = BuildPlan::from_lock_and_manifests(

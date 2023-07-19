@@ -127,7 +127,7 @@ impl Sessions {
 
     fn url_to_session(&self, uri: &Url) -> Result<Arc<Session>, LanguageServerError> {
         let path = PathBuf::from(uri.path());
-        let manifest = PackageManifestFile::from_dir(&path).map_err(|_| {
+        let (manifest, _) = PackageManifestFile::from_dir(&path).map_err(|_| {
             DocumentError::ManifestFileNotFound {
                 dir: path.to_string_lossy().to_string(),
             }

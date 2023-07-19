@@ -54,7 +54,7 @@ pub fn main() -> Result<()> {
     } else {
         std::env::current_dir()?
     };
-    let manifest = ManifestFile::from_dir(&dir)?;
+    let (manifest, _) = ManifestFile::from_dir(&dir)?;
     let pkg_manifest = if let ManifestFile::Package(pkg_manifest) = &manifest {
         pkg_manifest
     } else {
@@ -108,7 +108,7 @@ pub fn main() -> Result<()> {
             let id = &graph[*node].id();
 
             if let Some(pkg_manifest_file) = manifest_map.get(id) {
-                let manifest_file = ManifestFile::from_dir(pkg_manifest_file.path())?;
+                let (manifest_file, _) = ManifestFile::from_dir(pkg_manifest_file.path())?;
                 let ty_program = match compile_result.value.and_then(|programs| programs.typed) {
                     Some(ty_program) => ty_program,
                     _ => bail!(

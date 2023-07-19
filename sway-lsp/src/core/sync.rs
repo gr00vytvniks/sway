@@ -57,7 +57,7 @@ impl SyncWorkspace {
         &self,
         manifest_dir: &Path,
     ) -> Result<(), LanguageServerError> {
-        let manifest = PackageManifestFile::from_dir(manifest_dir).map_err(|_| {
+        let (manifest, _) = PackageManifestFile::from_dir(manifest_dir).map_err(|_| {
             DocumentError::ManifestFileNotFound {
                 dir: manifest_dir.to_string_lossy().to_string(),
             }
@@ -175,7 +175,7 @@ impl SyncWorkspace {
         let _ = self
             .manifest_path()
             .and_then(|manifest_path| PackageManifestFile::from_dir(&manifest_path).ok())
-            .map(|manifest| {
+            .map(|(manifest, _)| {
                 let manifest_dir = Arc::new(manifest.clone());
                 if let Some(temp_manifest_path) = self.temp_manifest_path() {
                     edit_manifest_dependency_paths(&manifest, &temp_manifest_path);

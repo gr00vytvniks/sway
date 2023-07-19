@@ -56,7 +56,11 @@ impl source::Pin for Source {
 }
 
 impl source::Fetch for Pinned {
-    fn fetch(&self, ctx: source::PinCtx, repo_path: &Path) -> Result<PackageManifestFile> {
+    fn fetch(
+        &self,
+        ctx: source::PinCtx,
+        repo_path: &Path,
+    ) -> Result<(PackageManifestFile, Vec<String>)> {
         // TODO: implement local cache search for ipfs sources.
         if ctx.offline {
             anyhow::bail!("offline fetching for IPFS sources is not supported")

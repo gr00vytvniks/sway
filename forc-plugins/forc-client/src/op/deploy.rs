@@ -331,7 +331,7 @@ mod test {
             .join("data");
 
         for entry in manifests_dir.read_dir().unwrap() {
-            let manifest =
+            let (manifest, _) =
                 PackageManifestFile::from_file(entry.unwrap().path().join("Forc.toml")).unwrap();
             contract_to_manifest.insert(manifest.project_name().to_string(), manifest);
         }

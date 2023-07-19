@@ -72,7 +72,7 @@ pub(crate) async fn handle_did_save_text_document(
                 .sync
                 .manifest_path()
                 .and_then(|manifest_path| PackageManifestFile::from_dir(&manifest_path).ok())
-                .map(|manifest| {
+                .map(|(manifest, _)| {
                     if let Some(temp_manifest_path) = &session.sync.temp_manifest_path() {
                         sync::edit_manifest_dependency_paths(&manifest, temp_manifest_path)
                     }

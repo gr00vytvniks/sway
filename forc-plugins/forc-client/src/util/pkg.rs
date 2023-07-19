@@ -5,7 +5,7 @@ use forc_pkg::{self as pkg, manifest::ManifestFile, BuildOpts, BuildPlan};
 use pkg::{build_with_options, BuiltPackage};
 
 pub(crate) fn built_pkgs(path: &Path, build_opts: BuildOpts) -> Result<Vec<Arc<BuiltPackage>>> {
-    let manifest_file = ManifestFile::from_dir(path)?;
+    let (manifest_file, _) = ManifestFile::from_dir(path)?;
     let lock_path = manifest_file.lock_path()?;
     let build_plan = BuildPlan::from_lock_and_manifests(
         &lock_path,

@@ -76,7 +76,7 @@ fn run() -> Result<()> {
         );
     };
 
-    let manifest_file = forc_pkg::manifest::ManifestFile::from_dir(&dir)?;
+    let (manifest_file, _) = forc_pkg::manifest::ManifestFile::from_dir(&dir)?;
 
     match manifest_file {
         ManifestFile::Workspace(ws) => {

@@ -183,7 +183,11 @@ impl source::Pin for Source {
 }
 
 impl source::Fetch for Pinned {
-    fn fetch(&self, ctx: source::PinCtx, repo_path: &Path) -> Result<PackageManifestFile> {
+    fn fetch(
+        &self,
+        ctx: source::PinCtx,
+        repo_path: &Path,
+    ) -> Result<(PackageManifestFile, Vec<String>)> {
         // Co-ordinate access to the git checkout directory using an advisory file lock.
         let mut lock = crate::pkg::path_lock(repo_path)?;
         // TODO: Here we assume that if the local path already exists, that it contains the
