@@ -1,6 +1,5 @@
 use crate::pkg::{manifest_file_missing, parsing_failed, wrong_program_type};
 use anyhow::{anyhow, bail, Context, Result};
-use forc_tracing::println_yellow_err;
 use forc_util::{find_nested_manifest_dir, find_parent_manifest_dir, validate_name};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -84,33 +83,40 @@ impl ManifestFile {
     }
 
     /// Returns manifest file map from member name to the corresponding package manifest file
-    pub fn member_manifests(&self) -> Result<MemberManifestFiles> {
+    pub fn member_manifests(&self) -> Result<(MemberManifestFiles, Vec<String>)> {
         let mut member_manifest_files = BTreeMap::new();
-        match self {
+        let warnings = match self {
             ManifestFile::Package(pkg_manifest_file) => {
                 // Check if this package is in a workspace, in that case insert all member manifests
                 if let Some(workspace_manifest_file) = pkg_manifest_file.workspace()? {
+                    let mut all_warnings = Vec::new();
                     for member_manifest in workspace_manifest_file.member_pkg_manifests()? {
                         let (member_manifest, warnings) =
                             member_manifest.with_context(|| "Invalid member manifest")?;
+                        all_warnings.extend(warnings);
                         member_manifest_files
                             .insert(member_manifest.project.name.clone(), member_manifest);
                     }
+                    all_warnings
                 } else {
                     let member_name = &pkg_manifest_file.project.name;
                     member_manifest_files.insert(member_name.clone(), *pkg_manifest_file.clone());
+                    vec![]
                 }
             }
             ManifestFile::Workspace(workspace_manifest_file) => {
+                let mut all_warnings = Vec::new();
                 for member_manifest in workspace_manifest_file.member_pkg_manifests()? {
                     let (member_manifest, warnings) =
                         member_manifest.with_context(|| "Invalid member manifest")?;
+                    all_warnings.extend(warnings);
                     member_manifest_files
                         .insert(member_manifest.project.name.clone(), member_manifest);
                 }
+                all_warnings
             }
-        }
-        Ok(member_manifest_files)
+        };
+        Ok((member_manifest_files, warnings))
     }
 
     /// Returns the path of the lock file for the given ManifestFile

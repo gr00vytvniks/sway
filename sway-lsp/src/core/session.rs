@@ -150,7 +150,7 @@ impl Session {
             }
         })?;
 
-        let member_manifests =
+        let (member_manifests, _warnings) =
             manifest
                 .member_manifests()
                 .map_err(|_| DocumentError::MemberManifestsFailed {

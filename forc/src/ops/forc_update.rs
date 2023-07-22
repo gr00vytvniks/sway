@@ -37,7 +37,7 @@ pub async fn update(command: UpdateCommand) -> Result<()> {
     let lock_path = lock_path(manifest.dir());
     let old_lock = Lock::from_path(&lock_path).ok().unwrap_or_default();
     let offline = false;
-    let member_manifests = manifest.member_manifests()?;
+    let (member_manifests, _warnings) = manifest.member_manifests()?;
     let ipfs_node = command.ipfs_node.unwrap_or_default();
     let new_plan = pkg::BuildPlan::from_manifests(&member_manifests, offline, ipfs_node)?;
     let new_lock = Lock::from_graph(new_plan.graph());

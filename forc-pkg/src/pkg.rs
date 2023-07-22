@@ -5,6 +5,7 @@ use crate::{
     CORE, PRELUDE, STD,
 };
 use anyhow::{anyhow, bail, Context, Error, Result};
+use forc_tracing::println_yellow_err;
 use forc_util::{
     default_output_directory, find_file_name, kebab_to_snake_case, print_compiling,
     print_on_failure, print_warnings, user_forc_directory,
@@ -549,6 +550,14 @@ impl Built {
     }
 }
 
+fn handle_warnings(mut warnings: Vec<String>) {
+    warnings.sort();
+    warnings.dedup();
+    for warning in warnings {
+        println_yellow_err(&warning);
+    }
+}
+
 impl BuildPlan {
     /// Create a new build plan for the project from the build options provided.
     ///
@@ -563,8 +572,10 @@ impl BuildPlan {
             std::env::current_dir()?
         };
 
-        let (manifest_file, warnings) = ManifestFile::from_dir(&manifest_dir)?;
-        let member_manifests = manifest_file.member_manifests()?;
+        let (manifest_file, _) = ManifestFile::from_dir(&manifest_dir)?;
+
+        let (member_manifests, warnings) = manifest_file.member_manifests()?;
+        handle_warnings(warnings);
         // Check if we have members to build so that we are not trying to build an empty workspace.
         if member_manifests.is_empty() {
             bail!("No member found to build")
@@ -959,6 +970,7 @@ fn validate_dep(
 
     // Ensure the manifest is accessible.
     let (dep_manifest, warnings) = PackageManifestFile::from_dir(&dep_path)?;
+    handle_warnings(warnings);
 
     // Check that the dependency's source matches the entry in the parent manifest.
     let dep_entry = node_manifest
@@ -1249,6 +1261,7 @@ fn pkg_graph_to_manifest_map(
             )
         })?;
         let (dep_manifest, warnings) = PackageManifestFile::from_dir(&dep_path)?;
+        handle_warnings(warnings);
         let dep = &graph[dep_node];
         manifest_map.insert(dep.id(), dep_manifest);
     }
@@ -2722,7 +2735,7 @@ fn test_root_pkg_order() {
         .unwrap()
         .join("test/src/e2e_vm_tests/test_programs/should_pass/forc/workspace_building/");
     let (manifest_file, _) = ManifestFile::from_dir(&manifest_dir).unwrap();
-    let member_manifests = manifest_file.member_manifests().unwrap();
+    let (member_manifests, _) = manifest_file.member_manifests().unwrap();
     let lock_path = manifest_file.lock_path().unwrap();
     let build_plan = BuildPlan::from_lock_and_manifests(
         &lock_path,

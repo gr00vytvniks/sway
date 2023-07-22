@@ -77,7 +77,7 @@ pub fn main() -> Result<()> {
         manifest.dir().to_string_lossy()
     );
 
-    let member_manifests = manifest.member_manifests()?;
+    let (member_manifests, _warnings) = manifest.member_manifests()?;
     let lock_path = manifest.lock_path()?;
 
     let ipfs_node = build_instructions.ipfs_node.clone().unwrap_or_default();

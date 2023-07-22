@@ -9,7 +9,7 @@ pub(crate) fn built_pkgs(path: &Path, build_opts: BuildOpts) -> Result<Vec<Arc<B
     let lock_path = manifest_file.lock_path()?;
     let build_plan = BuildPlan::from_lock_and_manifests(
         &lock_path,
-        &manifest_file.member_manifests()?,
+        &manifest_file.member_manifests()?.0,
         build_opts.pkg.locked,
         build_opts.pkg.offline,
         build_opts.pkg.ipfs_node.clone(),

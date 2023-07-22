@@ -22,7 +22,7 @@ pub fn check(command: CheckCommand, engines: &Engines) -> Result<CompileResult<t
         std::env::current_dir()?
     };
     let (manifest_file, _) = ManifestFile::from_dir(&this_dir)?;
-    let member_manifests = manifest_file.member_manifests()?;
+    let (member_manifests, _) = manifest_file.member_manifests()?;
     let lock_path = manifest_file.lock_path()?;
     let plan = pkg::BuildPlan::from_lock_and_manifests(
         &lock_path,
